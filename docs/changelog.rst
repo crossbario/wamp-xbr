@@ -8,6 +8,13 @@ This document contains a reverse-chronological list of changes to wamp-xbr.
     For detailed release information including artifacts,
     see :doc:`releases`.
 
+Unreleased
+----------
+
+**Build & CI/CD**
+
+* ``just check-typing`` passes again with ty 0.0.98 and later: ty 0.0.97 renamed the rule ``unresolved-import`` to ``import-not-found``, and since 0.0.98 the old name in the ``--ignore`` list is reported as ``renamed-rule``, which failed the check (`#217 <https://github.com/crossbario/wamp-xbr/issues/217>`_)
+
 26.10.1 (2026-10-19)
 --------------------
 

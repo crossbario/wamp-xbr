@@ -20,6 +20,9 @@
         "type": "git",
         "url": "git://github.com/crossbario/xbr-protocol.git"
     },
+    "engines": {
+        "node": ">= 24.0.0"
+    },
     "dependencies": {},
     "devDependencies": {
         "bindings": "^1.5.0",

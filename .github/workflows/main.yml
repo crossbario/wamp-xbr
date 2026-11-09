@@ -66,7 +66,7 @@ jobs:
       - name: Setup Node.js for Solidity compilation
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
 
       - name: Compile Solidity contracts (required for editable install)
         run: just compile-contracts
@@ -112,7 +112,7 @@ jobs:
       - name: Setup Node.js for Solidity compilation
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
 
       - name: Compile Solidity contracts (required for editable install)
         run: just compile-contracts
@@ -154,7 +154,7 @@ jobs:
       - name: Setup Node.js for Solidity compilation
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
 
       - name: Compile Solidity contracts (required for editable install)
         run: just compile-contracts
@@ -199,7 +199,7 @@ jobs:
       - name: Setup Node.js for Solidity compilation
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
 
       - name: Create venv and install build tools
         run: |

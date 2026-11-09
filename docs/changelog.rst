@@ -14,6 +14,7 @@ Unreleased
 **Build & CI/CD**
 
 * ``just check-typing`` passes again with ty 0.0.98 and later: ty 0.0.97 renamed the rule ``unresolved-import`` to ``import-not-found``, and since 0.0.98 the old name in the ``--ignore`` list is reported as ``renamed-rule``, which failed the check (`#217 <https://github.com/crossbario/wamp-xbr/issues/217>`_)
+* Compile the contracts on Node 24 (npm 11) instead of Node 20, which reached its end of life in April 2026, and declare ``"engines": {"node": ">= 24.0.0"}`` in ``package.json``. ``just install-node-tools`` now runs ``npm ci`` when ``package-lock.json`` exists, so it installs exactly the locked tree and fails when ``package.json`` and the lockfile disagree, instead of rewriting the lockfile; ``package-lock.json`` is regenerated to match ``package.json`` (``25.12.2``). Node 24 rather than 22, because npm 10 refuses the lockfile in ``npm ci`` with ``EBADPLATFORM``: ganache (via truffle) leaves a darwin-only ``fsevents`` entry from its bundled shrinkwrap in it (`#220 <https://github.com/crossbario/wamp-xbr/issues/220>`_)
 
 26.10.1 (2026-10-19)
 --------------------

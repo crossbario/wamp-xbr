@@ -1176,9 +1176,20 @@ install-node-tools:
     if [ -x "{{ TRUFFLE }}" ]; then
         echo "--> Truffle already installed: $({{ TRUFFLE }} version | head -1)"
     else
-        # Install dev dependencies (truffle, solhint, etc.)
-        echo "--> Installing npm dependencies..."
-        npm install
+        # Install dev dependencies (truffle, solhint, etc.). With a committed
+        # package-lock.json, use `npm ci`: it installs exactly the locked tree
+        # and fails if package.json and the lockfile disagree, where
+        # `npm install` would silently rewrite the lockfile (#220).
+        # This needs npm 11 (Node 24): npm 10 refuses this lockfile with
+        # EBADPLATFORM, because ganache (via truffle) leaves a darwin-only
+        # `fsevents` entry from its bundled shrinkwrap in it.
+        if [ -f package-lock.json ]; then
+            echo "--> Installing npm dependencies from package-lock.json (npm ci)..."
+            npm ci
+        else
+            echo "--> Installing npm dependencies (npm install)..."
+            npm install
+        fi
     fi
 
     # Verify installation

@@ -407,10 +407,20 @@ check-typing venv="":
     # TEMPORARY (WAMP fleet rollout wave1-2026-09): newer ty reports redundant-condition, unused-awaitable.
     # These are REAL bugs (e.g. `assert (x for x in y)` is always true, so the check never
     # runs) - tracked in #188, to be fixed before 26.9.1; then drop these ignores.
+    # missing-union-attribute and lost-keyword-for-regular-parameter: new in ty 0.0.100, ignored until their sites are fixed (#224).
+    #
+    # CI installs the newest ty, on purpose: we follow it as it moves (#223). ty
+    # renames rules now and then, and an --ignore naming an old name then silences
+    # nothing, so the rule comes back with many errors and the one warning that
+    # explains them is lost among them. The warnings are repeated at the end.
+    echo "    ty: $(ty --version)"
+    TY_OUT=$(mktemp)
+    trap 'rm -f "${TY_OUT}" "${TY_OUT}.names"' EXIT
+    set +e
     ty check \
         --python "${VENV_PYTHON}" \
         --ignore import-not-found \
-        --ignore unresolved-attribute \
+        --ignore missing-attribute \
         --ignore unresolved-reference \
         --ignore unresolved-global \
         --ignore possibly-missing-attribute \
@@ -420,7 +430,7 @@ check-typing venv="":
         --ignore invalid-assignment \
         --ignore invalid-argument-type \
         --ignore invalid-return-type \
-        --ignore invalid-method-override \
+        --ignore incompatible-method-override \
         --ignore invalid-type-form \
         --ignore unsupported-operator \
         --ignore too-many-positional-arguments \
@@ -438,7 +448,19 @@ check-typing venv="":
         --ignore invalid-super-argument \
         --ignore invalid-exception-caught \
         --ignore empty-body \
-        src/xbr/
+        --ignore missing-union-attribute \
+        --ignore lost-keyword-for-regular-parameter \
+        src/xbr/ 2>&1 | tee "${TY_OUT}"
+    rc=${PIPESTATUS[0]}
+    set -e
+    if grep -E '^warning\[(unknown-rule|renamed-rule|renamed-rule-in-ignore-comment)\]' "${TY_OUT}" > "${TY_OUT}.names"; then
+        echo ""
+        echo "==> ty does not know a rule name this recipe or a ty: ignore comment uses:"
+        sed 's/^/    /' "${TY_OUT}.names"
+        echo "    Rename it to ty's current name (the errors above may be that rule, back on)."
+        exit 1
+    fi
+    exit ${rc}
 
 # Run all code quality checks
 check venv="": (check-format venv) (check-lint venv) (check-typing venv)

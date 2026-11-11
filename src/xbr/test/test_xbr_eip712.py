@@ -495,10 +495,18 @@ class TestEip712CertificateChain(TestCase):
 
         # FIXME: allow length 2 and length > 3
         self.assertEqual(len(cert_chain), 3)
-        self.assertEqual(cert_chain[0].delegate, delegate_eth_key.address(binary=True))
-        self.assertEqual(cert_chain[0].csPubKey, delegate_cs_key.public_key(binary=True))
-        self.assertEqual(cert_chain[1].issuer, trustroot_eth_key.address(binary=True))
-        self.assertEqual(cert_chain[2].issuer, trustroot_eth_key.address(binary=True))
+
+        # The chain holds both certificate types: name each by its place, narrowed to its
+        # type (CCR-3 below checks the same), so its fields are checked as that type (#224).
+        delegate_cert, intermediate_cert, root_cert = cert_chain
+        assert isinstance(delegate_cert, EIP712DelegateCertificate)
+        assert isinstance(intermediate_cert, EIP712AuthorityCertificate)
+        assert isinstance(root_cert, EIP712AuthorityCertificate)
+
+        self.assertEqual(delegate_cert.delegate, delegate_eth_key.address(binary=True))
+        self.assertEqual(delegate_cert.csPubKey, delegate_cs_key.public_key(binary=True))
+        self.assertEqual(intermediate_cert.issuer, trustroot_eth_key.address(binary=True))
+        self.assertEqual(root_cert.issuer, trustroot_eth_key.address(binary=True))
 
         # Certificate Chain Rules (CCR):
         #
@@ -521,45 +529,45 @@ class TestEip712CertificateChain(TestCase):
             self.assertIsInstance(cert_chain[i], EIP712AuthorityCertificate)
 
         # CCR-1
-        chainId = cert_chain[2].chainId
-        verifyingContract = cert_chain[2].verifyingContract
+        chainId = root_cert.chainId
+        verifyingContract = root_cert.verifyingContract
         for cert in cert_chain:
             self.assertEqual(cert.chainId, chainId)
             self.assertEqual(cert.verifyingContract, verifyingContract)
 
         # CCR-2
-        realm = cert_chain[2].realm
-        for cert in cert_chain[1:]:
+        realm = root_cert.realm
+        for cert in (intermediate_cert, root_cert):
             self.assertEqual(cert.realm, realm)
 
         # CCR-4
-        self.assertEqual(cert_chain[2].subject, cert_chain[2].issuer)
+        self.assertEqual(root_cert.subject, root_cert.issuer)
 
         # CCR-5
-        self.assertEqual(cert_chain[1].issuer, cert_chain[2].subject)
+        self.assertEqual(intermediate_cert.issuer, root_cert.subject)
 
         # CCR-6
-        self.assertLessEqual(cert_chain[2].validFrom, cert_chain[1].validFrom)
+        self.assertLessEqual(root_cert.validFrom, intermediate_cert.validFrom)
 
         # CCR-7
-        self.assertTrue(cert_chain[2].capabilities == cert_chain[2].capabilities | cert_chain[1].capabilities)
+        self.assertTrue(root_cert.capabilities == root_cert.capabilities | intermediate_cert.capabilities)
 
         # CCR-8
-        self.assertEqual(cert_chain[1].subject, cert_chain[0].delegate)
+        self.assertEqual(intermediate_cert.subject, delegate_cert.delegate)
 
         # CCR-9
-        self.assertLessEqual(cert_chain[1].validFrom, cert_chain[0].validFrom)
+        self.assertLessEqual(intermediate_cert.validFrom, delegate_cert.validFrom)
 
         # CCR-10
-        _issuer = cert_chain[2].recover(a2b_hex(cert_sigs[2]))
+        _issuer = root_cert.recover(a2b_hex(cert_sigs[2]))
         self.assertEqual(_issuer, trustroot_eth_key.address(binary=True))
 
         # CCR-11
-        _issuer = cert_chain[1].recover(a2b_hex(cert_sigs[1]))
+        _issuer = intermediate_cert.recover(a2b_hex(cert_sigs[1]))
         self.assertEqual(_issuer, trustroot_eth_key.address(binary=True))
 
         # CCR-12
-        _issuer = cert_chain[0].recover(a2b_hex(cert_sigs[0]))
+        _issuer = delegate_cert.recover(a2b_hex(cert_sigs[0]))
         self.assertEqual(_issuer, delegate_eth_key.address(binary=True))
 
         yield self._sm.close()
@@ -574,10 +582,13 @@ class TestEip712CertificateChain(TestCase):
         delegate_cs_key: CryptosignKey = self._sm[6]
 
         certificates = parse_certificate_chain(self._certs_expected1)
+        delegate_cert, root_cert = certificates[0], certificates[2]
+        assert isinstance(delegate_cert, EIP712DelegateCertificate)
+        assert isinstance(root_cert, EIP712AuthorityCertificate)
 
-        self.assertEqual(certificates[2].issuer, trustroot_eth_key.address(binary=True))
+        self.assertEqual(root_cert.issuer, trustroot_eth_key.address(binary=True))
 
-        self.assertEqual(certificates[0].delegate, delegate_eth_key.address(binary=True))
-        self.assertEqual(certificates[0].csPubKey, delegate_cs_key.public_key(binary=True))
+        self.assertEqual(delegate_cert.delegate, delegate_eth_key.address(binary=True))
+        self.assertEqual(delegate_cert.csPubKey, delegate_cs_key.public_key(binary=True))
 
         yield self._sm.close()

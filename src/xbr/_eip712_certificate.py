@@ -35,5 +35,5 @@ class EIP712Certificate(object):
         raise NotImplementedError()
 
     @staticmethod
-    def parse(data) -> "EIP712Certificate":
+    def parse(obj) -> "EIP712Certificate":
         raise NotImplementedError()

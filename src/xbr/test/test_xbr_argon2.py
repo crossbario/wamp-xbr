@@ -63,7 +63,10 @@ if HAS_XBR:
         def test_pkm_from_argon2_secret(self):
             for tv in TESTVECTORS:
                 email, password, salt = tv["email"], tv["password"], tv["salt"]
-                for context, expected_priv_key in tv["contexts"].items():
+                # TESTVECTORS mixes value types, so narrow this one (#224)
+                contexts = tv["contexts"]
+                assert isinstance(contexts, dict)
+                for context, expected_priv_key in contexts.items():
                     expected_priv_key = a2b_hex(expected_priv_key)
                     priv_key = pkm_from_argon2_secret(email=email, password=password, context=context, salt=salt)
                     self.assertEqual(priv_key, expected_priv_key)

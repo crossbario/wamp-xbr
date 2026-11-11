@@ -35,6 +35,7 @@ else:
 from jinja2 import Environment, FileSystemLoader
 
 import xbr
+from xbr._util import contract
 from xbr._version import __version__
 
 if not xbr.HAS_XBR:
@@ -127,7 +128,8 @@ class Client(ApplicationSession):
         self._default_gas = 100000
         self._chain_id = 4
 
-        profile = config.extra.get("profile", None)
+        # ApplicationSession takes config=None too; then there is no profile (#224)
+        profile = config.extra.get("profile", None) if config is not None else None
 
         if profile and profile.cskey:
             assert type(profile.cskey) == bytes and len(profile.cskey) == 32
@@ -150,6 +152,13 @@ class Client(ApplicationSession):
             self.log.info("XBR ETH keys left unset")
 
         self._running = True
+
+    def _require_ethkey(self):
+        # Without an ethkey in the profile, the client has no XBR ETH key: a clear
+        # error for a command that needs one, not an AttributeError on None (#224).
+        if self._ethkey is None:
+            raise RuntimeError("no XBR ETH key loaded: the profile has no ethkey")
+        return self._ethkey
 
     def set_ethkey_from_profile(self, profile):
         """
@@ -190,6 +199,8 @@ class Client(ApplicationSession):
 
     def onChallenge(self, challenge):
         if challenge.method == "cryptosign":
+            # a challenge arrives over the session's transport, so it is set (#224)
+            assert self.transport is not None
             signed_challenge = self._key.sign_challenge(
                 challenge,
                 channel_id=self.transport.transport_details.channel_id.get(self.CHANNEL_BINDING, None),
@@ -481,7 +492,7 @@ class Client(ApplicationSession):
         wallet_type = "metamask"
 
         # delegate ethereum private key object
-        wallet_key = self._ethkey
+        wallet_key = self._require_ethkey()
         wallet_raw = self._ethkey_raw
 
         # delegate ethereum account canonical address
@@ -895,7 +906,7 @@ class Client(ApplicationSession):
 
     async def _do_open_channel(self, market_oid, channel_oid, channel_type, delegate, amount):
         member_key = self._ethkey_raw
-        member_adr = self._ethkey.public_key.to_canonical_address()
+        member_adr = self._require_ethkey().public_key.to_canonical_address()
 
         config = await self.call("xbr.marketmaker.get_config")
         marketmaker = binascii.a2b_hex(config["marketmaker"][2:])
@@ -909,10 +920,10 @@ class Client(ApplicationSession):
         if amount > 0:
             if channel_type == ChannelType.PAYMENT:
                 from_adr = member_adr
-                to_adr = xbr.xbrchannel.address
+                to_adr = contract("xbrchannel").address
             elif channel_type == ChannelType.PAYING:
                 from_adr = marketmaker
-                to_adr = xbr.xbrchannel.address
+                to_adr = contract("xbrchannel").address
             else:
                 assert False, "should not arrive here"
 
@@ -981,14 +992,18 @@ class Client(ApplicationSession):
         )
 
         # serialize transaction raw data from contract call and transaction settings
-        raw_transaction = xbr.xbrtoken.functions.approve(to_adr, amount).buildTransaction(
-            {
-                "from": from_adr,
-                "gas": gas,
-                "gasPrice": gasPrice,
-                "chainId": self._chain_id,  # https://stackoverflow.com/a/57901206/884770
-                "nonce": nonce,
-            }
+        raw_transaction = (
+            contract("xbrtoken")
+            .functions.approve(to_adr, amount)
+            .buildTransaction(
+                {
+                    "from": from_adr,
+                    "gas": gas,
+                    "gasPrice": gasPrice,
+                    "chainId": self._chain_id,  # https://stackoverflow.com/a/57901206/884770
+                    "nonce": nonce,
+                }
+            )
         )
         self.log.info(
             "{func}::[2/4] - Ethereum transaction created: raw_transaction=\n{raw_transaction}\n",

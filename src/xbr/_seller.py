@@ -40,6 +40,7 @@ from autobahn.wamp.exception import ApplicationError, TransportLost
 from autobahn.wamp.protocol import ApplicationSession
 from autobahn.wamp.types import CallDetails, RegisterOptions
 from txaio import time_ns
+from txaio.interfaces import ILogger
 
 from ._eip712_channel_close import recover_eip712_channel_close, sign_eip712_channel_close
 from ._util import pack_uint256, unpack_uint256
@@ -117,6 +118,9 @@ class KeySeries(object):
                 await self._rotate()
                 self._count_current = 0
 
+        if self._box is None:
+            # the first key is made by start() (#224)
+            raise RuntimeError("{}: no data encryption key yet (call start() first)".format(self.__class__.__name__))
         ciphertext = self._box.encrypt(data)
 
         return self._id, "cbor", ciphertext
@@ -188,7 +192,7 @@ class PayingChannel(object):
 
 
 class SimpleSeller(object):
-    log = None
+    log: ILogger
     KeySeries = None
 
     STATE_NONE = 0
@@ -323,7 +327,7 @@ class SimpleSeller(object):
                     signature = os.urandom(65)
                     provider_id = self._provider_id
 
-                    offer = await self._session.call(
+                    offer = await self._running_session().call(
                         "xbr.marketmaker.place_offer",
                         key_id,
                         api_id,
@@ -374,6 +378,13 @@ class SimpleSeller(object):
         self.log.debug("Created new key series {key_series}", key_series=key_series)
 
         return key_series
+
+    def _running_session(self):
+        # The WAMP session is set by start() and cleared by stop(): a call outside
+        # that window gets a clear error, not an AttributeError on None (#224).
+        if self._session is None:
+            raise RuntimeError("{}: not running (call start() first)".format(self.__class__.__name__))
+        return self._session
 
     async def start(self, session):
         """
@@ -497,7 +508,7 @@ class SimpleSeller(object):
         if not self._session or not self._session.is_attached():
             raise RuntimeError("market-maker session not attached")
 
-        paying_balance = await self._session.call(
+        paying_balance = await self._running_session().call(
             "xbr.marketmaker.get_paying_channel_balance", self._channel["channel_oid"]
         )
 
@@ -542,6 +553,8 @@ class SimpleSeller(object):
         """
         Called by a XBR Market Maker to close a paying channel.
         """
+        # registered with details_arg: called through WAMP, details is always set (#224)
+        assert details is not None
         assert type(market_maker_adr) == bytes and len(market_maker_adr) == 20, (
             "market_maker_adr must be bytes[20], but was {}".format(type(market_maker_adr))
         )
@@ -573,7 +586,7 @@ class SimpleSeller(object):
 
         # FIXME: must be the currently active channel .. and we need to track all of these
         if channel_oid != self._channel["channel_oid"]:
-            self._session.leave()
+            self._running_session().leave()
             raise ApplicationError(
                 "xbr.error.unexpected_channel_oid",
                 "{}.sell() - unexpected paying channel address: expected 0x{}, but got 0x{}".format(
@@ -695,6 +708,8 @@ class SimpleSeller(object):
         :return: The data encryption key, itself encrypted to the public key of the original buyer.
         :rtype: bytes
         """
+        # registered with details_arg: called through WAMP, details is always set (#224)
+        assert details is not None
         assert type(market_maker_adr) == bytes and len(market_maker_adr) == 20, "delegate_adr must be bytes[20]"
         assert type(buyer_pubkey) == bytes and len(buyer_pubkey) == 32, "buyer_pubkey must be bytes[32]"
         assert type(key_id) == bytes and len(key_id) == 16, "key_id must be bytes[16]"
@@ -733,7 +748,7 @@ class SimpleSeller(object):
 
         # FIXME: must be the currently active channel .. and we need to track all of these
         if channel_oid != self._channel["channel_oid"]:
-            self._session.leave()
+            self._running_session().leave()
             raise ApplicationError(
                 "xbr.error.unexpected_channel_oid",
                 "{}.sell() - unexpected paying channel address: expected 0x{}, but got 0x{}".format(

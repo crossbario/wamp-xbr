@@ -1330,7 +1330,9 @@ class FbsSchema(object):
         :return:
         """
         data: bytes
-        if type(sfile) == str and os.path.isfile(sfile):
+        # A str is a path: a missing file raised AttributeError ('str' has no read())
+        # instead of saying which file is missing (#224).
+        if isinstance(sfile, str):
             with open(sfile, "rb") as fd:
                 data = fd.read()
         else:
@@ -1708,6 +1710,8 @@ class FbsRepository(object):
                     tabsize=4,
                 )
                 if field.type.basetype == FbsType.Obj:
+                    # FbsType requires an objtype for an Obj (#224)
+                    assert field.type.objtype is not None
                     type_desc_str = field.type.objtype.split(".")[-1]
                     if self.objs[field.type.objtype].is_struct:
                         type_desc = hlval(type_desc_str, color="blue")
@@ -2061,7 +2065,7 @@ class FbsRepository(object):
         # will validate the WAMP args/kwargs application payload
         vt: FbsObject = self.objs[validation_type]
 
-        if type(value) == dict:
+        if isinstance(value, dict):
             vt_kwargs = set(vt.fields.keys())
 
             for k, v in value.items():

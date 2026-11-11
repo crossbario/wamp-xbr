@@ -26,8 +26,10 @@
 
 import txaio
 import web3
+from txaio.interfaces import ILogger
 
 import xbr
+from xbr._util import contract
 
 
 class SimpleBlockchain(object):
@@ -48,7 +50,7 @@ class SimpleBlockchain(object):
     NodeLicense_INFINITE = 1
     NodeLicense_FREE = 2
 
-    log = None
+    log: ILogger
     backgroundCaller = None
 
     def __init__(self, gateway=None):
@@ -104,7 +106,7 @@ class SimpleBlockchain(object):
         """
 
         def _get_market_status(_market_id):
-            owner = xbr.xbrnetwork.functions.getMarketOwner(_market_id).call()
+            owner = contract("xbrnetwork").functions.getMarketOwner(_market_id).call()
             if not owner or owner == "0x0000000000000000000000000000000000000000":
                 return None
             else:
@@ -125,7 +127,7 @@ class SimpleBlockchain(object):
         """
 
         def _get_domain_status(_domain_id):
-            status = xbr.xbrnetwork.functions.getDomainStatus(_domain_id).call()
+            status = contract("xbrnetwork").functions.getDomainStatus(_domain_id).call()
             if status == SimpleBlockchain.DomainStatus_NULL:
                 return None
             elif status == SimpleBlockchain.DomainStatus_ACTIVE:
@@ -191,14 +193,14 @@ class SimpleBlockchain(object):
         assert type(member_adr) == bytes and len(member_adr) == 20
 
         def _get_member_status(_member_adr):
-            level = xbr.xbrnetwork.functions.getMemberLevel(member_adr).call()
+            level = contract("xbrnetwork").functions.getMemberLevel(member_adr).call()
             if not level:
                 return None
             else:
-                eula = xbr.xbrnetwork.functions.getMemberEula(member_adr).call()
+                eula = contract("xbrnetwork").functions.getMemberEula(member_adr).call()
                 if not eula or eula.strip() == "":
                     return None
-                profile = xbr.xbrnetwork.functions.getMemberProfile(member_adr).call()
+                profile = contract("xbrnetwork").functions.getMemberProfile(member_adr).call()
                 if not profile or profile.strip() == "":
                     profile = None
                 return {
@@ -222,8 +224,11 @@ class SimpleBlockchain(object):
         assert type(account_adr) == bytes and len(account_adr) == 20
 
         def _get_balances(_adr):
-            balance_eth = self._w3.eth.getBalance(_adr)
-            balance_xbr = xbr.xbrtoken.functions.balanceOf(_adr).call()
+            w3 = self._w3
+            if w3 is None:
+                raise RuntimeError("SimpleBlockchain: not started (call start() first)")
+            balance_eth = w3.eth.getBalance(_adr)
+            balance_xbr = contract("xbrtoken").functions.balanceOf(_adr).call()
             return {
                 "ETH": balance_eth,
                 "XBR": balance_xbr,
@@ -240,6 +245,6 @@ class SimpleBlockchain(object):
         :rtype: dict
         """
         return {
-            "XBRToken": xbr.xbrtoken.address,
-            "XBRNetwork": xbr.xbrnetwork.address,
+            "XBRToken": contract("xbrtoken").address,
+            "XBRNetwork": contract("xbrnetwork").address,
         }

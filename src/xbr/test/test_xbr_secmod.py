@@ -162,6 +162,7 @@ class TestSecurityModule(TestCase):
             key_raw = a2b_hex(self._keys[i][2:])
             key = EthereumKey.from_bytes(key_raw)
             self.assertEqual(key.address(binary=False), self._addresses[i])
+            assert key._key is not None
             self.assertEqual(key._key.key, key_raw)
 
     def test_ethereum_sign_typed_data_pesu_manual(self):

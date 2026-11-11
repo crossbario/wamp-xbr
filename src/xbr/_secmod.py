@@ -63,7 +63,7 @@ class EthereumKey(object):
     ) -> None:
         if can_sign:
             # https://eth-account.readthedocs.io/en/latest/eth_account.html#eth_account.account.Account
-            assert type(key_or_address) == LocalAccount
+            assert isinstance(key_or_address, LocalAccount)
             self._key = key_or_address
             self._address = key_or_address.address
         else:
@@ -148,6 +148,8 @@ class EthereumKey(object):
             #     r = first 32 bytes of signature
             #     s = second 32 bytes of signature
             #     v = final 1 byte of signature
+            # only a key that can sign gets here, and that one has a LocalAccount (#224)
+            assert self._key is not None
             signature_vrs = ecsign(msg_hash, self._key.key)
 
             # concatenate signature components into byte string

@@ -407,7 +407,6 @@ check-typing venv="":
     # TEMPORARY (WAMP fleet rollout wave1-2026-09): newer ty reports redundant-condition, unused-awaitable.
     # These are REAL bugs (e.g. `assert (x for x in y)` is always true, so the check never
     # runs) - tracked in #188, to be fixed before 26.9.1; then drop these ignores.
-    # missing-union-attribute and lost-keyword-for-regular-parameter: new in ty 0.0.100, ignored until their sites are fixed (#224).
     #
     # CI installs the newest ty, on purpose: we follow it as it moves (#223). ty
     # renames rules now and then, and an --ignore naming an old name then silences
@@ -448,8 +447,6 @@ check-typing venv="":
         --ignore invalid-super-argument \
         --ignore invalid-exception-caught \
         --ignore empty-body \
-        --ignore missing-union-attribute \
-        --ignore lost-keyword-for-regular-parameter \
         src/xbr/ 2>&1 | tee "${TY_OUT}"
     rc=${PIPESTATUS[0]}
     set -e

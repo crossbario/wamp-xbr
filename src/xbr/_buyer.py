@@ -39,6 +39,7 @@ import txaio
 from autobahn.util import hl, hlval
 from autobahn.wamp.exception import ApplicationError
 from autobahn.wamp.protocol import ApplicationSession
+from txaio.interfaces import ILogger
 
 from ._eip712_channel_close import recover_eip712_channel_close, sign_eip712_channel_close
 from ._util import pack_uint256, unpack_uint256
@@ -78,7 +79,7 @@ class SimpleBuyer(object):
     handle the automated buying of data encryption keys from the XBR market maker.
     """
 
-    log = None
+    log: ILogger
 
     def __init__(self, market_maker_adr, buyer_key, max_price):
         """
@@ -152,6 +153,13 @@ class SimpleBuyer(object):
         # FIXME: poor mans local transaction store
         self._transaction_idx = {}
         self._transactions = []
+
+    def _running_session(self):
+        # The WAMP session is set by start() and cleared by stop(): a call outside
+        # that window gets a clear error, not an AttributeError on None (#224).
+        if self._session is None:
+            raise RuntimeError("{}: not running (call start() first)".format(self.__class__.__name__))
+        return self._session
 
     async def start(self, session, consumer_id):
         """
@@ -242,7 +250,7 @@ class SimpleBuyer(object):
         """
         assert self._session and self._session.is_attached()
 
-        payment_balance = await self._session.call(
+        payment_balance = await self._running_session().call(
             "xbr.marketmaker.get_payment_channel_balance", self._channel["channel_oid"]
         )
 
@@ -265,7 +273,7 @@ class SimpleBuyer(object):
         # FIXME
         signature = os.urandom(64)
 
-        payment_channel = await self._session.call(
+        payment_channel = await self._running_session().call(
             "xbr.marketmaker.open_payment_channel", buyer_addr, self._addr, amount, signature
         )
 
@@ -328,7 +336,7 @@ class SimpleBuyer(object):
             self._keys[key_id] = False
 
             # get (current) price for key we want to buy
-            quote = await self._session.call("xbr.marketmaker.get_quote", key_id)
+            quote = await self._running_session().call("xbr.marketmaker.get_quote", key_id)
 
             # set price we pay set to the (current) quoted price
             amount = unpack_uint256(quote["price"])
@@ -393,7 +401,7 @@ class SimpleBuyer(object):
                         )
 
                         # call market maker to initiate closing of payment channel
-                        await self._session.call(
+                        await self._running_session().call(
                             "xbr.marketmaker.close_channel",
                             channel_oid,
                             verifying_chain_id,
@@ -450,7 +458,7 @@ class SimpleBuyer(object):
 
             # call the market maker to buy the key
             try:
-                receipt = await self._session.call(
+                receipt = await self._running_session().call(
                     "xbr.marketmaker.buy_key",
                     self._addr,
                     buyer_pubkey,

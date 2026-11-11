@@ -31,6 +31,20 @@ from typing import Dict, List, Union
 import web3
 
 
+def contract(name):
+    """
+    The XBR contract instance ``xbr.<name>`` (e.g. ``"xbrtoken"``), set by
+    ``xbr.setProvider()``: a clear error when it has not been called yet, not an
+    AttributeError on None (#224).
+    """
+    import xbr
+
+    instance = getattr(xbr, name)
+    if instance is None:
+        raise RuntimeError("xbr.{} is not set: call xbr.setProvider() first".format(name))
+    return instance
+
+
 def make_w3(gateway_config=None):
     """
     Create a Web3 instance configured and ready-to-use gateway to the blockchain.
